@@ -1,2 +1,3 @@
 # Resource
- Resource of __Space Invaders - GRUB__
+
+Resource of **Space Invaders - GRUB**

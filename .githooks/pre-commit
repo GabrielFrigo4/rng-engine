@@ -1,0 +1,29 @@
+#!/usr/bin/env sh
+set -e
+
+echo "Running pre-commit checks..."
+
+# Whitespace & EOF check
+if ! git diff --check --cached; then
+	echo "❌ [pre-commit] Whitespace or EOF errors detected." >&2
+	exit 1
+fi
+
+# Git Index file modes check (0755 vs 0644 validation)
+if git diff --cached --summary | grep -q "create mode 100755"; then
+	echo "⚠️  [pre-commit] Executable files staged. Please verify file modes."
+fi
+
+# Prettier validation for .md files
+if command -v npx >/dev/null 2>&1; then
+	_md_files=$(git diff --cached --name-only --diff-filter=ACM | grep '\.md$' || true)
+	if [ -n "${_md_files}" ]; then
+		echo "Checking markdown formatting..."
+		npx prettier --check ${_md_files}
+	fi
+else
+	echo "⚠️  [pre-commit] npx not found, skipping prettier check."
+fi
+
+echo "✅ [pre-commit] Checks passed!"
+exit 0

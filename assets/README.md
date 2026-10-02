@@ -1,2 +1,3 @@
 # Assets
- Assets of __Space Invaders - GRUB__
+
+Assets of **Space Invaders - GRUB**
