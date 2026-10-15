@@ -17,4 +17,4 @@ jobs:
               with:
                   node-version: "20"
             - name: Check formatting
-              run: npx prettier --check "**/*.md"
+              run: npx prettier --check "**/*.{md,json,jsonc,yml,yaml,html,css}"
