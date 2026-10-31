@@ -1,48 +1,54 @@
-# VS Code Files
-.vscode/
+# ----------------------------------------------------------------
+# Git Ignore: RNG Engine
+# ----------------------------------------------------------------
 
-# Binary Files
+# ================================================================
+# Build Outputs & Binary Directories
+# ================================================================
 _bin/
 _obj/
-
-# Prerequisites
-*.d
-
-# Compiled Object files
 *.slo
 *.lo
 *.o
 *.obj
-
-# Precompiled Headers
-*.gch
-*.pch
-
-# Linker files
-*.ilk
-
-# Debugger Files
-*.pdb
-
-# Compiled Dynamic libraries
-*.so
-*.dylib
-*.dll
-
-# Fortran module files
-*.mod
-*.smod
-
-# Compiled Static libraries
 *.lai
 *.la
 *.a
 *.lib
-
-# Executables
+*.so
+*.dylib
+*.dll
 *.exe
 *.out
 *.app
 
-# debug information files
+# ================================================================
+# Precompiled Headers & Compiler Artefacts
+# ================================================================
+*.d
+*.gch
+*.pch
+*.mod
+*.smod
+
+# ================================================================
+# Debugger & Linker Files
+# ================================================================
+*.ilk
+*.pdb
 *.dwo
+
+# ================================================================
+# Editor & IDE Artefacts
+# ================================================================
+.vscode/
+.idea/
+*~
+*.swp
+*.swo
+
+# ================================================================
+# Operating System Cruft
+# ================================================================
+.DS_Store
+Thumbs.db

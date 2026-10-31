@@ -144,6 +144,7 @@ Para garantir longevidade, idempotência e excelência técnica, toda contribui�
 
 - **Cidadão de Primeira Classe Isolado:** Qualquer repositório do ecossistema (`Shell`, `Profile`, `Vault`, `Setup`, `Editor/*`) DEVE poder ser clonado e operado sozinho sem requerer a existência de nenhum outro componente. A ausência de módulos pares NUNCA deve gerar erros, falhas ou avisos ao usuário.
 - **Sinergia Oportunística Silenciosa:** Se um componente detectar a presença de outro no ambiente hospedeiro (`Emacs` detectando `Vault`, `Shell` detectando `Vault`, `Profile` sincronizando `Skills`), ele se conecta e ativa recursos avançados imediatamente e em silêncio absoluto.
+- **Auto-Cura Reentrante de Perfis Multi-Shell (Zero Manual Tweaks):** Comandos de sincronização e atualização (`upsh`, `resh`, `uprc`) executados em qualquer shell no Windows propagam e auto-curam automaticamente e atomicamente os perfis físicos em disco de todos os demais ambientes (`Documents\PowerShell`, `%APPDATA%\nushell`, `%LOCALAPPDATA%\clink`), eliminando toda e qualquer necessidade de cópia manual de arquivos ou intervenções pós-clone.
 
 ### 20. Regra do Hermetismo de Produção & Autonomia Soberana (_Rule of Production Hermeticity_)
 
@@ -166,7 +167,12 @@ Para garantir longevidade, idempotência e excelência técnica, toda contribui�
     - `Helix`: `~/.config/helix`.
     - `NeoVim`: `~/.config/nvim`.
     - `Vim`: `~/.vim`.
-- **Zero Symlinks para a Bancada de Desenvolvimento:** É estritamente proibido criar links simbólicos de sistema, configurações de shell (`.bashrc`, `.zshrc`) ou dotfiles que apontem para a pasta de desenvolvimento `~/Documents/Environment`. O provisionamento no SO deve ser feito exclusivamente clonando cada repositório em sua localização canônica via `make install`.
+- **Zero Symlinks para a Bancada de Desenvolvimento:** Não crie links simbólicos de sistema, configurações de shell (`.bashrc`, `.zshrc`) ou dotfiles que apontem para a pasta de desenvolvimento `~/Documents/Environment`. O provisionamento no SO deve ser feito exclusivamente clonando cada repositório em sua localização canônica via `make install`.
+- **Ciclo Obrigatório de Propagação (Dev-Hub -> Git Push -> Git Pull em Produção):** O fluxo de atualização entre a bancada e os ambientes de produção do sistema operacional obedece a um pipeline estrito, rastreado e auditável:
+    1. **Edição Estrita na Bancada:** Toda e qualquer alteração de código, scripts, módulos ou dotfiles é implementada, testada e validada no clone de desenvolvimento sob o Environment (`~/Documents/Environment/<Componente>`).
+    2. **Integração no Git:** As alterações são commitadas e enviadas ao repositório remoto oficial (`git push`).
+    3. **Atualização Soberana em Produção:** Os clones de produção (`/usr/local/share/shell`, `~/.local/share/profile`, `~/.emacs.d`, `~/.config/nvim`, etc.) são atualizados exclusivamente via `git pull` (ou rotinas e aliases como `upsh`, `uprc`, `uped`, `make pull`, `make install`).
+    4. **Sincronização Limpa via Git:** Não copie arquivos manualmente (`cp`) da bancada para os clones de produção de modo a deixar a árvore de trabalho de produção com alterações não rastreadas (`unstaged/uncommitted changes`). Os repositórios de produção devem permanecer com working tree 100% limpa (`clean working tree`) e sincronizados via histórico do Git.
 - **Hierarquia de Resolução de Caminhos (XDG vs. FHS):**
     - **Universal Shell:**
         1. `/usr/local/share/shell` — Padrão prático para o par `root` + administrador do host.
@@ -201,6 +207,11 @@ Para garantir longevidade, idempotência e excelência técnica, toda contribui�
 - **Zero Falha Cega & Argument Forwarding:** Utilitários e wrappers antifrágeis nunca omitem falhas silenciosamente nem engolem argumentos:
     - Se a chave física não for encontrada no disco, tentam conexão delegada para o agente SSH em execução em vez de passar `-i <caminho_inexistente>`.
     - Encaminham transparentemente todos os parâmetros adicionais (`"$@"`) para o comando subjacente, permitindo execução remota de comandos, flags de porta e modo batch sem atrito.
+- **Imunidade a Recursão de Aliases em Runtimes Case-Insensitive:** No PowerShell, funções e comandos não devem possuir aliases homônimos (ex: `New-Alias "foo-bar" "Foo-Bar"`), prevenindo a supressão da função e desvios para busca de executáveis inexistentes no PATH. Declarações utilizam exclusivamente `Set-Alias -Force -Option AllScope` para garantir reentrância idempotente.
+- **Sincronização Dual de PATH em Runtimes Case-Sensitive sob Windows:** No NuShell sobre Windows, a divergência entre a convenção do sistema (`Path`) e a sensibilidade a maiúsculas de `$env` exige a inicialização e sincronização dual de `$env.Path` e `$env.PATH` com `$env.ENV_CONVERSIONS`, impedindo que processos-filhos do Win32 executem sob caminhos obsoletos.
+- **Injeção Dinâmica Defensiva de Credenciais em Runtimes Isolados:** No NuShell, repositórios privados recebem a injeção explícita do helper do GitHub CLI (`gh auth git-credential`) via flag `-c` do Git, imunizando comandos contra falhas de lookup de subshells sem expor tokens ou violar o veto a chaves SSH para o GitHub.
+- **Higienização Defensiva Pré-Pull na Suíte de Editores:** Rotinas de atualização de editores executam limpeza prévia de stubs locais gerados em tempo de execução (`git clean -fd usr/local`) antes de disparar `git pull --ff-only`, prevenindo abortos causados por arquivos não rastreados.
+- **Paridade UTF-8 no Git:** Configuração explícita de `core.quotepath = false` em todas as estações de trabalho para impedir a fuga octal de nomes contendo diacríticos (`ç`, `ã`).
 
 ---
 
@@ -236,10 +247,18 @@ Para garantir longevidade, idempotência e excelência técnica, toda contribui�
 
     echo "📦 [Nome]: Iniciando configuração..."
 
-    ELEVATE="$( [ "$(id -u)" -ne 0 ] && { command -v doas > "/dev/null" 2>&1 && echo "doas" || { command -v sudo > "/dev/null" 2>&1 && echo "sudo"; }; } )"
+    ELEVATE=""
+    if [ "$(id -u)" -ne 0 ]; then
+        if command -v doas > "/dev/null" 2>&1; then
+            ELEVATE="doas"
+        elif command -v sudo > "/dev/null" 2>&1; then
+            ELEVATE="sudo"
+        fi
+    fi
 
     echo "✅ [Nome]: Configurado com sucesso!"
     ```
+    - Todo comando `shift` em scripts sob `set -eu` deve ser precedido por validação de quantidade de parâmetros (`[ "$#" -ge N ] && shift N`), prevenindo o término fatal imediato exigido pelo padrão POSIX para _special built-ins_ quando `$# < N`.
 - **Utilitários e Orquestradores (`Shell`, `Profile`, `Environment`):** Adotam a biblioteca semântica de emissão (`ui.sh` / `_ui_*`), garantindo TUI ANSI em terminais interativos (`[ -t 1 ]`) e fallback gracioso em texto plano para pipelines e modo batch:
     - `_ui_step`: Marcador de etapa primária em Ciano (`==>`).
     - `_ui_sub`: Subtarefa ou item inspecionado em Azul (`↳`).
@@ -249,11 +268,16 @@ Para garantir longevidade, idempotência e excelência técnica, toda contribui�
     - `_ui_info`: Informação contextual ou nota de recarga em Magenta (`ℹ️ `).
     - `_ui_banner`: Delimitador estrutural com réguas duplas de 64 caracteres `=` em Ciano.
 
-### 6. Padrão Exclusivo de Comentários Estruturais (Regra do Não-Vazamento)
+### 6. Taxonomia Tripartite de Comentários & Padrão Estrutural (Regra do Não-Vazamento)
 
-- **Zero Comentários Narrativos:** Comentários explicativos inline são estritamente proibidos em código, scripts, templates e exemplos. O código expressa sua intenção através de separação por linhas em branco e nomenclatura semântica.
-- **Cabeçalho de Topo (Header Banner):** Exclusivo para as linhas 2 a 4 do arquivo, delimitado por exatamente 64 hífens (`# ----------------------------------------------------------------`).
-- **Corpo do Script:** Seções estruturais internas usam estritamente réguas de 32 caracteres (`### ================================` ou `### --------------------------------`), com o título estritamente contido no limite de 32 caracteres (não-vazamento).
+- **1. Comentários de Sistema (PERMITIDOS):** Instruções indispensáveis para o sistema operacional, interpretadores, compiladores e linters (ex.: shebangs `#!/usr/bin/env sh`, diretivas de binding `;;; -*- lexical-binding: t -*-`, pragmas `# shellcheck disable=...`, `#pragma once`, frontmatter YAML).
+- **2. Comentários Estruturais de 64/32 Colunas (PERMITIDOS):**
+    - **Header Banner de Topo:** Exclusivo para as linhas 2 a 4 do arquivo, delimitado por exatamente 64 hífens (`# ----------------------------------------------------------------`).
+    - **Seções e Subseções Internas:** Delimitadores internos usam estritamente réguas de 32 colunas (`### ================================` ou `### --------------------------------`), com o título estritamente contido no limite de 32 caracteres (regra do não-vazamento). Em arquivos `.gitignore`, seções estruturais adotam réguas de 64 sinais de igualdade (`# ================================================================`).
+- **3. Comentários Explicativos/Narrativos (PROIBIDOS):** Não insira comentários explicativos, narrativos ou redundantes que parafraseiem lógica algorítmica. Esta regra aplica-se a:
+    - Código-fonte, scripts executáveis e receitas de infraestrutura.
+    - Dotfiles, Makefiles e arquivos de configuração.
+    - **Blocos de código dentro de Markdowns:** Trechos de código ou snippets embutidos em arquivos `.md` NÃO devem conter comentários explicativos inline; o código deve ser autoexplicativo por construção, modularização e nomenclatura semântica.
 
 ### 7. Ordem Canônica de Priorização de Pacotes (Dispatch Universal)
 
@@ -262,9 +286,9 @@ Para garantir longevidade, idempotência e excelência técnica, toda contribui�
 2. **Receitas Exclusivas de Linux (`linux/`):**
    `dnf` _(Fedora)_ $\rightarrow$ `apt` _(Debian)_ $\rightarrow$ `pacman` _(Arch)_
 
-### 8. Preferência Absoluta por Flags Longas Autoexplicativas
+### 8. Preferência por Flags Longas Autoexplicativas
 
-- Use sempre flags descritivas: `apt install --yes`, `dnf install --assumeyes`, `pkg install --yes`, `pacman -S --needed --noconfirm`.
+- Use preferencialmente flags descritivas: `apt install --yes`, `dnf install --assumeyes`, `pkg install --yes`, `pacman -S --needed --noconfirm`.
 
 ### 9. Nomenclatura Semântica de Diretórios
 
@@ -275,18 +299,24 @@ Para garantir longevidade, idempotência e excelência técnica, toda contribui�
 ### 10. Orçamento de Linhas (Regra 8 - 16 - 128 - 256)
 
 - **Piso Rígido (< 8 linhas):** Nenhum script isolado deve possuir menos de 8 linhas úteis. Scripts de 1 a 7 linhas são bloqueados no pre-commit e CI (`sys.exit(1)`).
-- **Averiguação Inferior (Aviso <= 16 linhas):** Scripts com 8 a 16 linhas são sinalizados pelos auditores estáticos como candidatos à averiguação e consolidação temática em seus respectivos módulos, evitando fragmentação excessiva.
+- **Averiguação Inferior (Aviso <= 16 linhas):** Scripts com 8 a 16 linhas são sinalizados pelos auditores estáticos como candidatos à consolidação temática em seus respectivos módulos, evitando fragmentação excessiva.
 - **Faixa Canônica (Sweet Spot 17 a 128 linhas):** Faixa de equilíbrio arquitetural ideal entre granularidade atômica, legibilidade UNIX e manutenibilidade Clean Code.
-- **Averiguação Superior (Aviso 129 a 255 linhas):** Scripts com 129 a 255 linhas são sinalizados pelos auditores estáticos como candidatos à averiguação e modularização.
+- **Averiguação Superior (Aviso 129 a 255 linhas):** Scripts com 129 a 255 linhas são sinalizados pelos auditores estáticos como candidatos à modularização.
 - **Teto Rígido (> 256 linhas):** Nenhum script deve ultrapassar 256 linhas úteis, gerando bloqueio no pre-commit e CI (`sys.exit(1)`), salvo exceções técnicas documentadas na Whitelist dos auditores com justificativa explícita.
 
 ### 11. Execução pelo Shell Ativo (_Active Shell Invocation_)
 
-- Funções utilitárias do terminal e rotinas interativas (como `reinstall-shell`, `bench-shell`, `install.sh`) NUNCA devem invocar `sh <script>` de forma cega.
+- Funções utilitárias do terminal e rotinas interativas (como `reinstall-shell`, `bench-shell`, `install.sh`) não devem invocar `sh <script>` de forma cega.
 - Em distribuições Linux baseadas em Debian e Ubuntu, `/bin/sh` aponta para o interpretador `dash`, cuja BNF estrita rejeita nomes em `kebab-case` (`-`) em funções (`update-all`, `reinstall-shell`, etc.).
-- A execução de sub-rotinas interativas DEVE sempre delegar para o shell ativo em execução seguindo a ordem canônica de preferência: `command -v "$(_detect_shell)" || command -v zsh || command -v bash || command -v sh`. No FreeBSD, o `/bin/sh` permanece como fallback leve de sistema. Scripts instaladores devem conter guards de auto-elevação para o shell interativo suportado do usuário.
+- A execução de sub-rotinas interativas deve sempre delegar para o shell ativo em execução seguindo a ordem canônica de preferência: `command -v "$(_detect_shell)" || command -v zsh || command -v bash || command -v sh`. No FreeBSD, o `/bin/sh` permanece como fallback leve de sistema. Scripts instaladores devem conter guards de auto-elevação para o shell interativo suportado do usuário.
 
 ### 12. Nomenclatura Kebab-Case para Funções de Shell
 
-- Todas as funções utilitárias do motor interativo (`Shell`) adotam estritamente a convenção **kebab-case** (`reinstall-shell`, `update-editors`, `update-git`, `open-neovim`).
-- O interpretador `dash` é formalmente descartado como shell interativo por incompatibilidade com essa convenção, focando a experiência do usuário nos shells suportados (`bash`, `zsh` e FreeBSD `/bin/sh`).
+- Todas as funções utilitárias do motor interativo (`Shell`) adotam a convenção **kebab-case** (`reinstall-shell`, `update-editors`, `update-git`, `open-neovim`).
+- A matriz de shells interativos suportados compreende `zsh`, `bash`, FreeBSD `/bin/sh` e OpenBSD `ksh`. O interpretador `dash` é formalmente descartado como shell interativo por incompatibilidade com essa convenção.
+
+### 13. Simetria de Escopo & Não-Assimetria de Subgrupo na Documentação
+
+- **Comportamento Universal Pertence à Camada do Grupo:** Se um comportamento, protocolo, capacidade ou invariante de segurança é compartilhado por todo um grupo de componentes (ex: todos os carregadores do Vault excluem templates, todos os scripts do Setup usam elevação antifrágil, todos os shells suportam prompts pill/micro), ele DEVE ser documentado na camada de abstração do grupo (no documento canônico de arquitetura, README raiz do módulo ou seção geral).
+- **Proibição de Falsa Especialização:** É proibido rotular ou destacar um sub-membro específico com uma propriedade universal do grupo como se fosse uma característica ou diferencial exclusivo daquele sub-membro (ex: indicar em uma tabela que apenas um arquivo específico filtra templates). Isso gera falsas assimetrias e desorienta o leitor, sugerindo erroneamente que os demais membros não possuem a propriedade ou que aquele membro é uma exceção isolada.
+- **Especialização Legítima:** Um sub-membro específico só deve detalhar um comportamento do grupo se ele o implementar de forma substancialmente mais especializada, diferenciada ou tecnicamente otimizada (ex: execução em espaço de memória do processo via Lua no Clink vs fork de processos em batch, ou parser nativo em Rust/C vs script interpretado), explicando com clareza conceitual em que aspectos a sua implementação específica se aprofunda ou diverge em relação à invariante universal.
