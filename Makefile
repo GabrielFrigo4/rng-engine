@@ -108,8 +108,9 @@ package: build
 	fi
 
 clean:
-	echo "🧹 Limpando artefatos de compilação..."
-	rm -rf $(BIN_DIR) $(OBJ_DIR)
+	echo "🧹 Limpando artefatos de compilação, caches e .venv..."
+	rm -rf $(BIN_DIR) $(OBJ_DIR) .venv
+	find . -type d -name "__pycache__" -exec rm -rf {} + 2> "/dev/null" || true
 	echo "✅ Workspace limpo!"
 
 ### ================================
