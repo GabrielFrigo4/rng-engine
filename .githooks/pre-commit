@@ -160,7 +160,12 @@ fi
 ### --------------------------------
 ### PROIBICAO DE ESCAPES OCTAIS
 ### --------------------------------
-_bad_octal=$(git diff --cached -S'\033' --name-only 2> "/dev/null" | grep -E '(\.sh$|Makefile$|\.py$)' || true)
+_bad_octal=""
+for _f in $(git diff --cached --name-only 2> "/dev/null" | grep -E '(\.sh$|Makefile$|\.py$)' || true); do
+	if [ -f "${_f}" ] && grep -q '\\033' "${_f}" 2> "/dev/null"; then
+		_bad_octal="${_bad_octal} ${_f}"
+	fi
+done
 if [ -n "${_bad_octal}" ]; then
 	echo "❌ [pre-commit] Escape octal (\\033) detectado em: ${_bad_octal}. Use \$'\\e' ou \\x1b." >&2
 	exit 1
@@ -169,7 +174,12 @@ fi
 ### --------------------------------
 ### QUOTED REDIRECTS CHECK
 ### --------------------------------
-_unquoted_null=$(git diff --cached -S "> /dev/null" --name-only 2> "/dev/null" | grep -E '\.sh$' || true)
+_unquoted_null=""
+for _f in $(git diff --cached --name-only 2> "/dev/null" | grep -E '\.sh$' || true); do
+	if [ -f "${_f}" ] && grep -q '> /dev/null' "${_f}" 2> "/dev/null"; then
+		_unquoted_null="${_unquoted_null} ${_f}"
+	fi
+done
 if [ -n "${_unquoted_null}" ]; then
 	echo "❌ [pre-commit] Unquoted redirect '> /dev/null' detected in: ${_unquoted_null}" >&2
 	echo "   Use '> \"/dev/null\"' with quotes as required by PRINCIPLES.md." >&2
