@@ -79,19 +79,10 @@ O RNG Engine herda a genialidade do LÖVE2D na distribuição de binários finai
 O motor adota um Makefile POSIX silencioso compatível com Linux, FreeBSD e Windows (MSYS2):
 
 ```sh
-# Exibir o menu interativo com os alvos disponíveis
 make help
-
-# Compilar o motor
 make build
-
-# Executar a aplicação
 make run
-
-# Formatar o código-fonte C/C++ e Markdown
 make format
-
-# Executar os quality gates locais
 make ci
 ```
 

@@ -26,7 +26,7 @@ CPPFLAGS     = -I$(INCLUDE_DIR) -D_DEFAULT_SOURCE -D_POSIX_C_SOURCE=202405L -D_F
 LDFLAGS      = -flto -pie -Wl,-z,relro,-z,now
 
 LIBS_SDL     = -lSDL3
-LIBS_LUA     = -llua5.5 2>/dev/null || -llua5.4 || -llua
+LIBS_LUA     = -llua
 LIBS_GL      = -lGL
 
 TARGET_EXE   = $(BIN_DIR)/rng-engine
@@ -75,10 +75,10 @@ build:
 	_c_files=$$(find $(SOURCE_DIR) -name "*.c" 2> "/dev/null" || true); \
 	_cpp_files=$$(find $(SOURCE_DIR) -name "*.cpp" 2> "/dev/null" || true); \
 	if [ -n "$$_cpp_files" ]; then \
-		$(CXX) $(CXXFLAGS) $(WFLAGS) $(CPPFLAGS) $$_cpp_files $$_c_files $(LDFLAGS) $(LIBS_SDL) $(LIBS_GL) -o $(TARGET_EXE) 2>/dev/null || \
+		$(CXX) $(CXXFLAGS) $(WFLAGS) $(CPPFLAGS) $$_cpp_files $$_c_files $(LDFLAGS) $(LIBS_SDL) $(LIBS_GL) -o $(TARGET_EXE) 2> "/dev/null" || \
 		echo "ℹ️  Dependências gráficas (SDL3/OpenGL) não instaladas no host atual; compilação suspensa com segurança."; \
 	elif [ -n "$$_c_files" ]; then \
-		$(CC) $(CFLAGS) $(WFLAGS) $(CPPFLAGS) $$_c_files $(LDFLAGS) $(LIBS_SDL) $(LIBS_GL) -o $(TARGET_EXE) 2>/dev/null || \
+		$(CC) $(CFLAGS) $(WFLAGS) $(CPPFLAGS) $$_c_files $(LDFLAGS) $(LIBS_SDL) $(LIBS_GL) -o $(TARGET_EXE) 2> "/dev/null" || \
 		echo "ℹ️  Dependências gráficas (SDL3/OpenGL) não instaladas no host atual; compilação suspensa com segurança."; \
 	else \
 		echo "ℹ️  Nenhum arquivo fonte em source/ ainda."; \
@@ -122,7 +122,7 @@ format: clang-format prettier
 clang-format:
 	echo "🎨 Formatando C/C++ com clang-format..."
 	if command -v clang-format > "/dev/null" 2>&1; then \
-		find source include -type f \( -name "*.c" -o -name "*.cpp" -o -name "*.h" \) -exec clang-format -i {} + 2>/dev/null || true; \
+		find source include -type f \( -name "*.c" -o -name "*.cpp" -o -name "*.h" \) -exec clang-format -i {} + 2> "/dev/null" || true; \
 	fi
 
 prettier:
